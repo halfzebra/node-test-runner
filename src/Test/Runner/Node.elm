@@ -1,4 +1,4 @@
-module Test.Runner.Node exposing (TestProgram, runWithOptions)
+port module Test.Runner.Node exposing (TestProgram, runWithOptions)
 
 {-|
 
@@ -42,9 +42,7 @@ nativeMessages =
     Native.RunTest.messages
 
 
-messages : Sub Msg
-messages =
-    Sub.map Receive nativeMessages
+port receive : (String -> msg) -> Sub msg
 
 
 type alias TestId =
@@ -70,16 +68,13 @@ type alias TestProgram =
 
 
 type Msg
-    = NoOp
-    | Dispatch Time
+    = Dispatch Time
     | Receive String
     | Complete TestId (List String) (List Expectation) Time Time
     | Finish Time
 
 
-send : String -> Task x ()
-send str =
-    Native.RunTest.send str
+port send : String -> Cmd msg
 
 
 warn : String -> a -> a
@@ -94,14 +89,7 @@ warn str result =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg ({ testReporter } as model) =
     case msg of
-        NoOp ->
-            ( model, Cmd.none )
-
         Receive str ->
-            let
-                _ =
-                    Debug.log "[received]" str
-            in
             ( model, Cmd.none )
 
         Finish finishTime ->
@@ -134,7 +122,6 @@ update msg ({ testReporter } as model) =
                         ]
                         |> Encode.encode 0
                         |> send
-                        |> Task.perform (\_ -> NoOp)
             in
             ( model, cmd )
 
@@ -159,7 +146,6 @@ update msg ({ testReporter } as model) =
                                 ]
                                 |> Encode.encode 0
                                 |> send
-                                |> Task.perform (\_ -> NoOp)
 
                         Nothing ->
                             Cmd.none
@@ -270,7 +256,6 @@ init { startTime, paths, fuzzRuns, initialSeed, runners, report } =
                         ]
                         |> Encode.encode 0
                         |> send
-                        |> Task.perform (\_ -> NoOp)
 
                 Nothing ->
                     Cmd.none
@@ -289,5 +274,5 @@ runWithOptions options =
     App.run options
         { init = init
         , update = update
-        , subscriptions = \_ -> Debug.log "wiring up subscriptions" messages
+        , subscriptions = \_ -> receive Receive
         }
